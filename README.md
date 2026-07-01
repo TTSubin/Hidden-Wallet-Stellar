@@ -22,9 +22,10 @@ HiddenWallet is a Stellar-based payment wallet that connects to Freighter, displ
 
 ## Prerequisites
 
-- Node.js 18 or newer
+- Node.js 22 or newer
 - npm
 - PostgreSQL for backend features
+- Docker and Docker Compose for containerized local runs
 - Freighter browser extension
 - A funded Stellar testnet account
 
@@ -111,6 +112,43 @@ npm run dev
 ```
 
 Open the Vite local URL, usually `http://localhost:5173`.
+
+## Run with Docker
+
+This repository includes Docker files for a local Stellar testnet stack:
+
+- PostgreSQL testnet database
+- NestJS backend API
+- React frontend served by Nginx
+
+Create a local Docker env file:
+
+```bash
+cp .env.docker.example .env
+```
+
+Update `.env` if you need Stellar USDC/off-ramp support:
+
+```env
+STELLAR_USDC_ASSET_ISSUER=<testnet-usdc-issuer-public-key>
+PARTNER_STELLAR_ADDRESS=<partner-stellar-public-key>
+GAIAN_API_KEY=<optional-gaian-api-key>
+GAIAN_PAYMENT_BASE_URL=<optional-gaian-payment-url>
+```
+
+Start the full stack:
+
+```bash
+docker compose up --build
+```
+
+Open:
+
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:3000/api`
+- PostgreSQL: `localhost:5432`
+
+The Docker backend uses `STELLAR_NETWORK=TESTNET`, `https://horizon-testnet.stellar.org`, and runs `prisma db push` on startup to sync the local testnet database schema.
 
 ## Local Testnet Transaction Flow
 

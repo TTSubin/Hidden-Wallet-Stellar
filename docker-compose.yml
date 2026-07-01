@@ -1,0 +1,86 @@
+services:
+  db:
+    image: postgres:16
+    container_name: hiddenwallet_testnet_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-hiddenwallet_testnet}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - hiddenwallet_testnet_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hiddenwallet_testnet_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-hiddenwallet_testnet}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-dev_secret_change_me}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      AUTH_DOMAIN: ${AUTH_DOMAIN:-http://localhost:5173}
+      AUTH_CHALLENGE_TTL_SECONDS: ${AUTH_CHALLENGE_TTL_SECONDS:-300}
+      STELLAR_NETWORK: TESTNET
+      STELLAR_HORIZON_URL: ${STELLAR_HORIZON_URL:-https://horizon-testnet.stellar.org}
+      STELLAR_USDC_ASSET_CODE: ${STELLAR_USDC_ASSET_CODE:-USDC}
+      STELLAR_USDC_ASSET_ISSUER: ${STELLAR_USDC_ASSET_ISSUER:-}
+      STELLAR_USDC_DECIMALS: ${STELLAR_USDC_DECIMALS:-7}
+      PARTNER_STELLAR_ADDRESS: ${PARTNER_STELLAR_ADDRESS:-}
+      GAIAN_PAYMENT_BASE_URL: ${GAIAN_PAYMENT_BASE_URL:-}
+      GAIAN_USER_BASE_URL: ${GAIAN_USER_BASE_URL:-}
+      GAIAN_QR_BASE_URL: ${GAIAN_QR_BASE_URL:-}
+      GAIAN_API_KEY: ${GAIAN_API_KEY:-}
+      GAIAN_QR_API_KEY: ${GAIAN_QR_API_KEY:-}
+      HIDDEN_WALLET_FEE_PERCENT: ${HIDDEN_WALLET_FEE_PERCENT:-0.2}
+      TIER_PLUS_THRESHOLD: ${TIER_PLUS_THRESHOLD:-300}
+      TIER_PREMIUM_THRESHOLD: ${TIER_PREMIUM_THRESHOLD:-700}
+      TIER_ELITE_THRESHOLD: ${TIER_ELITE_THRESHOLD:-1150}
+      TIER_STANDARD_COMMISSION: ${TIER_STANDARD_COMMISSION:-0.15}
+      TIER_PLUS_COMMISSION: ${TIER_PLUS_COMMISSION:-0.30}
+      TIER_PREMIUM_COMMISSION: ${TIER_PREMIUM_COMMISSION:-0.45}
+      TIER_ELITE_COMMISSION: ${TIER_ELITE_COMMISSION:-0.60}
+      POINTS_OVER_50_USD: ${POINTS_OVER_50_USD:-10}
+      POINTS_DAILY_3_TX: ${POINTS_DAILY_3_TX:-50}
+      POINTS_WEEKLY_15_TX: ${POINTS_WEEKLY_15_TX:-100}
+      POINTS_MONTHLY_50_TX: ${POINTS_MONTHLY_50_TX:-300}
+      POINTS_REFERRAL_BONUS: ${POINTS_REFERRAL_BONUS:-50}
+      MAX_REFERRAL_POINTS_PER_PERIOD: ${MAX_REFERRAL_POINTS_PER_PERIOD:-500}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+        VITE_STELLAR_NETWORK: TESTNET
+        VITE_STELLAR_HORIZON_URL: ${STELLAR_HORIZON_URL:-https://horizon-testnet.stellar.org}
+        VITE_STELLAR_USDC_ASSET_CODE: ${STELLAR_USDC_ASSET_CODE:-USDC}
+        VITE_STELLAR_USDC_ASSET_ISSUER: ${STELLAR_USDC_ASSET_ISSUER:-}
+        VITE_STELLAR_USDC_DECIMALS: ${STELLAR_USDC_DECIMALS:-7}
+        VITE_GAIAN_API_URL: ${VITE_GAIAN_API_URL:-}
+        VITE_GAIAN_API_KEY: ${VITE_GAIAN_API_KEY:-}
+    container_name: hiddenwallet_testnet_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+
+volumes:
+  hiddenwallet_testnet_pgdata:

@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { randomBytes } from 'crypto';
-import { Keypair } from '@stellar/stellar-sdk';
+import { hash, Keypair, xdr } from '@stellar/stellar-sdk';
 import { VerifyDto } from './dto/verify.dto';
 import { KycService } from '../modules/kyc/kyc.service';
 import { isValidStellarPublicKey } from '../stellar/stellar.util';
@@ -20,6 +20,54 @@ function decodeSignature(signature: string): Buffer {
     return Buffer.from(trimmed, 'hex');
   }
   return Buffer.from(trimmed, 'base64');
+}
+
+function uniqueBuffers(buffers: Buffer[]): Buffer[] {
+  const seen = new Set<string>();
+  return buffers.filter((buffer) => {
+    const key = buffer.toString('hex');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function getSignatureCandidates(signature: string): Buffer[] {
+  const raw = decodeSignature(signature);
+  const candidates = [raw];
+
+  if (raw.length !== 64) {
+    try {
+      const decorated = xdr.DecoratedSignature.fromXDR(raw);
+      candidates.push(Buffer.from(decorated.signature()));
+    } catch {
+      // Some wallet APIs return a raw 64-byte signature, others return decorated XDR.
+    }
+  }
+
+  return uniqueBuffers(candidates);
+}
+
+function getMessagePayloadCandidates(message: string): Buffer[] {
+  const raw = Buffer.from(message, 'utf8');
+  const stellarPrefixed = Buffer.from(`Stellar Signed Message:\n${message}`, 'utf8');
+  const stellarLengthPrefixed = Buffer.from(
+    `Stellar Signed Message:\n${raw.length}${message}`,
+    'utf8',
+  );
+  const stellarPersonalSign = Buffer.from(
+    `\x19Stellar Signed Message:\n${raw.length}${message}`,
+    'utf8',
+  );
+
+  const payloads = [
+    raw,
+    stellarPrefixed,
+    stellarLengthPrefixed,
+    stellarPersonalSign,
+  ];
+
+  return uniqueBuffers([...payloads, ...payloads.map((payload) => hash(payload))]);
 }
 
 @Injectable()
@@ -158,9 +206,11 @@ export class AuthService {
 
     try {
       const publicKey = Keypair.fromPublicKey(address);
-      const bytes = Buffer.from(dto.message, 'utf8');
-      const signature = decodeSignature(dto.signature);
-      const ok = publicKey.verify(bytes, signature);
+      const signatures = getSignatureCandidates(dto.signature);
+      const payloads = getMessagePayloadCandidates(dto.message);
+      const ok = signatures.some((signature) =>
+        payloads.some((payload) => publicKey.verify(payload, signature)),
+      );
       if (!ok) {
         throw new BadRequestException('INVALID_SIGNATURE');
       }
