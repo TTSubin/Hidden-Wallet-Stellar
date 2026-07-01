@@ -5,6 +5,7 @@ import { useWallet } from '@/context/WalletContext';
 import { Scan, Check, AlertTriangle, ChevronDown, Wallet, Building2, Loader2, X, User, AlertCircle, CreditCard, Copy } from 'lucide-react';
 import QRScanner from '@/components/QRScanner';
 import { createPaymentOrder, confirmPaymentOrder, getPaymentOrder, syncPaymentOrder, lookupUser, scanQr, getDefaultPaymentMethod, paymentsQuote } from '@/services/api';
+import { getTransactionFeedbackMessage } from '@/lib/stellar';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +36,7 @@ const Send = () => {
   const location = useLocation();
   const { isAuthenticated, isAuthLoading, user } = useAuth();
   const {
+    sendXlm,
     sendUsdc,
     xlmBalance,
     usdcBalance,
@@ -53,7 +55,10 @@ const Send = () => {
   const [amount, setAmount] = useState(''); // USD amount
   const [amountVnd, setAmountVnd] = useState(''); // VND amount
   const [amountSource, setAmountSource] = useState<'vnd' | 'usd' | null>(null); // Which input was edited
+  const [selectedToken, setSelectedToken] = useState<'USDC' | 'XLM'>('USDC');
   const [error, setError] = useState('');
+  const [txHash, setTxHash] = useState<string | null>(null);
+  const [txFeedback, setTxFeedback] = useState<string | null>(null);
 
   const [exchangeRate, setExchangeRate] = useState<number>(25500);
   const [isFetchingRate, setIsFetchingRate] = useState(false);
@@ -525,6 +530,10 @@ const Send = () => {
     const qrStringToUse = scannedQrString || recipientOffchainQr;
 
     if ((scanResult === 'external' && externalBank) || qrStringToUse) {
+      if (selectedToken === 'XLM') {
+        setError('XLM test transactions only support direct Stellar wallet transfers.');
+        return;
+      }
       const isVnRecipient = (recipientCountry ?? '').toUpperCase() === 'VN';
       if (kycApproved) {
         if (amountNum < 0.71) { setError('Minimum amount per transaction is $0.71'); return; }
@@ -596,12 +605,18 @@ const Send = () => {
     if (!recipient) { setError('Enter recipient'); return; }
     if (!recipientValid || !recipientAddress) { setError('Verify recipient first'); return; }
     if (isNaN(amountNum) || amountNum <= 0) { setError('Invalid amount'); return; }
-    if (amountNum > usdcBalance) { setError('Insufficient USDC balance'); return; }
-    if (xlmBalance < minGasBalanceXlm) { setError('Not enough XLM for Stellar network fees'); return; }
+    if (selectedToken === 'XLM') {
+      if (amountNum + networkFeeXlm > xlmBalance) { setError('Insufficient XLM balance'); return; }
+    } else {
+      if (amountNum > usdcBalance) { setError('Insufficient USDC balance'); return; }
+      if (xlmBalance < minGasBalanceXlm) { setError('Not enough XLM for Stellar network fees'); return; }
+    }
     setStep('review');
   };
 
   const handleConfirm = async () => {
+    setTxHash(null);
+    setTxFeedback(null);
     setStep('sending');
 
     try {
@@ -611,6 +626,9 @@ const Send = () => {
       // BANK TRANSFER (Offchain) - Route through Payment API
       // This handles both: 1) Scanned bank QR, 2) Username with offchain default
       if (scanResult === 'external' && externalBank && qrStringToUse) {
+        if (selectedToken === 'XLM') {
+          throw new Error('XLM test transactions only support direct Stellar wallet transfers.');
+        }
         // Get payer wallet address
         const payerAddress = (user as { walletAddress?: string })?.walletAddress || linkedWallets[0]?.address;
 
@@ -637,8 +655,11 @@ const Send = () => {
         const result = await sendUsdc(toAddress, parseFloat(totalCrypto));
 
         if (!result.success || !result.digest) {
-          throw new Error('On-chain transfer failed');
+          setTxFeedback(getTransactionFeedbackMessage({ success: false }));
+          throw new Error(result.message || 'On-chain transfer failed');
         }
+        setTxHash(result.digest);
+        setTxFeedback(getTransactionFeedbackMessage({ success: true, hash: result.digest }));
 
         // 3. Confirm payment with transaction digest
         try {
@@ -677,12 +698,22 @@ const Send = () => {
         return;
       }
 
-      const result = await sendUsdc(recipientAddress, parseFloat(amount));
+      const amountNum = parseFloat(amount);
+      const result = selectedToken === 'XLM'
+        ? await sendXlm(recipientAddress, amountNum)
+        : await sendUsdc(recipientAddress, amountNum);
+
+      const feedback = getTransactionFeedbackMessage({
+        success: result.success,
+        hash: result.digest,
+      });
+      setTxFeedback(result.success ? feedback : result.message || feedback);
 
       if (result.success) {
+        setTxHash(result.digest ?? null);
         setStep('success');
       } else {
-        setError('Transaction failed');
+        setError(result.message || feedback);
         setStep('error');
       }
     } catch (err) {
@@ -713,7 +744,7 @@ const Send = () => {
           <div className="animate-fade-in">
             <Loader2 className="w-12 h-12 mx-auto mb-6 animate-spin text-muted-foreground" />
             <p className="text-xl font-bold mb-2">Sending...</p>
-            <p className="text-muted-foreground">${amount}</p>
+            <p className="text-muted-foreground">{amount} {selectedToken}</p>
           </div>
         </div>
       </div>
@@ -731,6 +762,9 @@ const Send = () => {
             </div>
             <p className="text-xl font-bold mb-2">Failed</p>
             <p className="text-muted-foreground text-sm">{error}</p>
+            {txFeedback && txFeedback !== error && (
+              <p className="text-muted-foreground text-xs mt-2">{txFeedback}</p>
+            )}
           </div>
           <button onClick={() => setStep('input')} className="btn-primary mt-8 animate-slide-up">
             Try Again
@@ -755,7 +789,7 @@ const Send = () => {
     const handleShareInvoice = async () => {
       const text = invoiceData
         ? `✅ Transfer Successful\n\n${invoiceData.fiatAmount.toLocaleString()} ${invoiceData.fiatCurrency}\n\nFrom: @${username}\nTo: ${invoiceData.recipientName}\nBank: ${invoiceData.bankName}\nAccount: ${invoiceData.accountNumber}\n\nSent: ${formatTime(invoiceData.timestamp)}\nFee: ${invoiceData.fee.toLocaleString()} ${invoiceData.fiatCurrency}\nOrder: ${invoiceData.orderId.slice(0, 8)}...`
-        : `Sent ${amount} USDC to ${recipientDisplayName || recipient}`;
+        : `Sent ${amount} ${selectedToken} to ${recipientDisplayName || recipient}`;
 
       if (navigator.share) {
         try {
@@ -847,13 +881,22 @@ const Send = () => {
               <Check className="w-8 h-8 text-success" />
             </div>
             <p className="text-xl font-bold mb-2">Sent!</p>
-            <p className="text-2xl font-bold">{amount} USDC</p>
+            <p className="text-2xl font-bold">{amount} {selectedToken}</p>
             {fiatPayoutAmount && (
               <p className="text-success font-medium mt-1">
                 ≈ {fiatPayoutAmount.amount.toLocaleString()} {fiatPayoutAmount.currency}
               </p>
             )}
             <p className="text-muted-foreground mt-1 text-sm">to {recipientDisplayName || recipient}</p>
+            {txFeedback && (
+              <p className="text-success font-medium mt-4 text-sm">{txFeedback}</p>
+            )}
+            {txHash && (
+              <div className="mt-3 px-3 py-2 rounded-xl bg-secondary text-left">
+                <p className="text-xs text-muted-foreground mb-1">Transaction hash</p>
+                <p className="font-mono text-xs break-all">{txHash}</p>
+              </div>
+            )}
           </div>
           <button onClick={() => navigate('/dashboard')} className="btn-primary mt-8 animate-slide-up">
             Done
@@ -907,7 +950,7 @@ const Send = () => {
               )}
               <div className="flex justify-between items-center py-3">
                 <span className="text-muted-foreground text-sm">Amount</span>
-                <span className="font-medium">${amount}</span>
+                <span className="font-medium">{amount} {selectedToken}</span>
               </div>
               {isExternal && (
                 <div className="flex justify-between items-center py-3">
@@ -926,13 +969,17 @@ const Send = () => {
               </div>
               <div className="flex justify-between items-center py-3 bg-secondary -mx-4 px-4 rounded-xl">
                 <span className="font-semibold text-sm">Total</span>
-                <span className="font-bold">${(() => {
-                  const base = parseFloat(amount);
-                  const fee = isExternal && offrampQuote?.platformFee?.cryptoEquivalent != null
-                    ? Number(offrampQuote.platformFee.cryptoEquivalent)
-                    : 0;
-                  return (base + fee).toFixed(3);
-                })()}</span>
+                <span className="font-bold">
+                  {selectedToken === 'XLM'
+                    ? `${amount} XLM`
+                    : `$${(() => {
+                      const base = parseFloat(amount);
+                      const fee = isExternal && offrampQuote?.platformFee?.cryptoEquivalent != null
+                        ? Number(offrampQuote.platformFee.cryptoEquivalent)
+                        : 0;
+                      return (base + fee).toFixed(3);
+                    })()}`}
+                </span>
               </div>
             </div>
           </div>
@@ -1134,12 +1181,38 @@ const Send = () => {
 
             {/* Amount - Dual Currency Converter */}
             <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                {(['USDC', 'XLM'] as const).map((token) => (
+                  <button
+                    key={token}
+                    type="button"
+                    onClick={() => {
+                      setSelectedToken(token);
+                      setAmount('');
+                      setAmountVnd('');
+                      setAmountSource(null);
+                      setError('');
+                    }}
+                    className={`py-3 rounded-xl border text-sm font-semibold transition-colors ${
+                      selectedToken === token
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border bg-background hover:bg-secondary/50'
+                    }`}
+                  >
+                    {token === 'XLM' ? 'XLM Testnet' : 'USDC'}
+                  </button>
+                ))}
+              </div>
+
               <div className="flex justify-between items-center">
                 <label className="text-sm font-medium text-muted-foreground">Amount</label>
-                <span className="text-sm text-muted-foreground">Balance: ${usdcBalance.toFixed(2)}</span>
+                <span className="text-sm text-muted-foreground">
+                  Balance: {selectedToken === 'XLM' ? `${xlmBalance.toFixed(4)} XLM` : `$${usdcBalance.toFixed(2)}`}
+                </span>
               </div>
 
               {/* VND Input */}
+              {selectedToken === 'USDC' && (
               <div className="relative">
                 <input
                   type="text"
@@ -1167,6 +1240,7 @@ const Send = () => {
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">₫</span>
               </div>
+              )}
 
               {/* USD Input */}
               <div className="relative">
@@ -1179,19 +1253,21 @@ const Send = () => {
                     // Allow decimal numbers
                     if (value === '' || /^\d*\.?\d*$/.test(value)) {
                       setAmount(value);
-                      // Convert to VND
-                      const usdNum = parseFloat(value) || 0;
-                      const vndNum = Math.round(usdNum * exchangeRate);
-                      setAmountVnd(vndNum > 0 ? vndNum.toString() : '');
-                      setAmountSource('usd');
+                      if (selectedToken === 'USDC') {
+                        // Convert to VND
+                        const usdNum = parseFloat(value) || 0;
+                        const vndNum = Math.round(usdNum * exchangeRate);
+                        setAmountVnd(vndNum > 0 ? vndNum.toString() : '');
+                        setAmountSource('usd');
+                      }
                     }
                     setError('');
                   }}
                   step="0.01"
-                  placeholder="0.00"
+                  placeholder={selectedToken === 'XLM' ? '0.0000000' : '0.00'}
                   className="input-modern text-lg font-semibold pr-16"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">USDC</span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">{selectedToken}</span>
               </div>
             </div>
 

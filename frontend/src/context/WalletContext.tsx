@@ -108,6 +108,7 @@ type WalletContextType = WalletState & {
   signAuthMessage: (message: string) => Promise<string>;
   setUsername: (username: string) => void;
   sendUsdc: (toAddress: string, amount: number) => Promise<{ success: boolean; digest?: string }>;
+  sendXlm: (toAddress: string, amount: number) => Promise<{ success: boolean; digest?: string; message?: string }>;
   disconnect: () => void;
   addBankAccount: (bank: Omit<LinkedBank, 'id'>) => void;
   removeBankAccount: (id: string) => void;
@@ -343,6 +344,60 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const sendXlm = async (toAddress: string, amount: number): Promise<{ success: boolean; digest?: string; message?: string }> => {
+    if (!walletAddress) return { success: false, message: 'No wallet connected' };
+    if (STELLAR_NETWORK !== 'TESTNET') return { success: false, message: 'XLM test transaction flow requires Stellar testnet' };
+    if (!isValidWalletAddress(toAddress)) return { success: false, message: 'Invalid Stellar recipient address' };
+    if (!Number.isFinite(amount) || amount <= 0) return { success: false, message: 'Invalid XLM amount' };
+
+    try {
+      const server = new Horizon.Server(HORIZON_URL);
+      const source = await server.loadAccount(walletAddress);
+      const tx = new TransactionBuilder(source, {
+        fee: BASE_FEE,
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(
+          Operation.payment({
+            destination: toAddress,
+            asset: Asset.native(),
+            amount: amount.toFixed(7),
+          }),
+        )
+        .setTimeout(180)
+        .build();
+
+      const signed = await signTransaction(tx.toXDR(), { networkPassphrase: NETWORK_PASSPHRASE, address: walletAddress });
+      if (signed.error) throw new Error(signed.error.message);
+
+      const signedTx = TransactionBuilder.fromXDR(signed.signedTxXdr, NETWORK_PASSPHRASE);
+      const result = await server.submitTransaction(signedTx);
+
+      setState((prev) => ({
+        ...prev,
+        transactions: [
+          {
+            id: result.hash,
+            type: 'sent',
+            to: `${toAddress.slice(0, 6)}...${toAddress.slice(-5)}`,
+            amount,
+            timestamp: new Date(),
+            token: 'XLM',
+            digest: result.hash,
+          },
+          ...prev.transactions,
+        ],
+      }));
+
+      setTimeout(() => refreshBalance(), 2000);
+      return { success: true, digest: result.hash, message: 'XLM transaction submitted' };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to send XLM transaction';
+      console.error('Failed to send XLM on Stellar testnet:', error);
+      return { success: false, message };
+    }
+  };
+
   const disconnect = () => {
     setWalletAddress(null);
     setState({
@@ -401,6 +456,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         signAuthMessage,
         setUsername,
         sendUsdc,
+        sendXlm,
         disconnect,
         addBankAccount,
         removeBankAccount,

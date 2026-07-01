@@ -30,3 +30,8 @@ export function getStellarNetworkPassphrase(network: StellarNetwork): string {
 export function getConfiguredStellarNetwork(): StellarNetwork {
   return import.meta.env.VITE_STELLAR_NETWORK === 'PUBLIC' ? 'PUBLIC' : 'TESTNET';
 }
+
+export function getTransactionFeedbackMessage(args: { success: boolean; hash?: string }): string {
+  if (!args.success) return 'Transaction failed. Please try again.';
+  return args.hash ? `Transaction submitted: ${args.hash}` : 'Transaction submitted successfully.';
+}
