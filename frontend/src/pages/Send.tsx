@@ -5,7 +5,7 @@ import { useWallet } from '@/context/WalletContext';
 import { Scan, Check, AlertTriangle, ChevronDown, Wallet, Building2, Loader2, X, User, AlertCircle, CreditCard, Copy } from 'lucide-react';
 import QRScanner from '@/components/QRScanner';
 import { createPaymentOrder, confirmPaymentOrder, getPaymentOrder, syncPaymentOrder, lookupUser, scanQr, getDefaultPaymentMethod, paymentsQuote } from '@/services/api';
-import { getTransactionFeedbackMessage } from '@/lib/stellar';
+import { getConfiguredStellarNetwork, getStellarExplorerTxUrl, getTransactionFeedbackMessage } from '@/lib/stellar';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -888,13 +888,17 @@ const Send = () => {
               </p>
             )}
             <p className="text-muted-foreground mt-1 text-sm">to {recipientDisplayName || recipient}</p>
-            {txFeedback && (
-              <p className="text-success font-medium mt-4 text-sm">{txFeedback}</p>
-            )}
             {txHash && (
-              <div className="mt-3 px-3 py-2 rounded-xl bg-secondary text-left">
-                <p className="text-xs text-muted-foreground mb-1">Transaction hash</p>
-                <p className="font-mono text-xs break-all">{txHash}</p>
+              <div className="mt-4 text-sm">
+                <p className="text-success font-medium">Transaction success</p>
+                <a
+                  href={getStellarExplorerTxUrl(txHash, getConfiguredStellarNetwork())}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-success hover:underline"
+                >
+                  Click here to see
+                </a>
               </div>
             )}
           </div>

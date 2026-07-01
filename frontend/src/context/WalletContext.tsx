@@ -21,6 +21,16 @@ type HorizonAccountBalance = {
   asset_issuer?: string;
 };
 
+type HorizonPaymentOperation = {
+  type: string;
+  from?: string;
+  to?: string;
+  amount?: string;
+  asset_type?: string;
+  asset_code?: string;
+  asset_issuer?: string;
+};
+
 const STELLAR_NETWORK = getConfiguredStellarNetwork();
 const NETWORK_PASSPHRASE = getStellarNetworkPassphrase(STELLAR_NETWORK);
 const HORIZON_URL =
@@ -195,14 +205,44 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     try {
       const server = new Horizon.Server(HORIZON_URL);
       const records = await server.transactions().forAccount(address).order('desc').limit(20).call();
-      return records.records.map((tx) => ({
-        id: tx.hash,
-        type: tx.source_account === address ? 'sent' : 'received',
-        amount: 0,
-        timestamp: new Date(tx.created_at),
-        token: 'USDC',
-        digest: tx.hash,
-      }));
+      const txs = await Promise.all(
+        records.records.map(async (tx) => {
+          let matchingPayment: HorizonPaymentOperation | undefined;
+
+          try {
+            const ops = await server.operations().forTransaction(tx.hash).call();
+            matchingPayment = (ops.records as HorizonPaymentOperation[]).find((op) => {
+              if (op.type !== 'payment' || !op.amount) return false;
+              const isConfiguredUsdc =
+                op.asset_code === USDC_ASSET_CODE &&
+                (!USDC_ASSET_ISSUER || op.asset_issuer === USDC_ASSET_ISSUER);
+              return (op.asset_type === 'native' || isConfiguredUsdc) && (op.from === address || op.to === address);
+            });
+          } catch {
+            matchingPayment = undefined;
+          }
+
+          if (!matchingPayment) {
+            return null;
+          }
+
+          const isSent = matchingPayment.from === address;
+          const token = matchingPayment?.asset_type === 'native' ? 'XLM' : 'USDC';
+          const amount = Number(matchingPayment?.amount ?? '0');
+
+          return {
+            id: tx.hash,
+            type: isSent ? 'sent' : 'received',
+            to: matchingPayment?.to,
+            from: matchingPayment?.from,
+            amount: Number.isFinite(amount) ? amount : 0,
+            timestamp: new Date(tx.created_at),
+            token,
+            digest: tx.hash,
+          } satisfies TransactionRecord;
+        }),
+      );
+      return txs.filter((tx): tx is TransactionRecord => Boolean(tx));
     } catch {
       return [];
     }

@@ -15,6 +15,7 @@ const History = () => {
     } = useWallet();
 
     const [copiedDigest, setCopiedDigest] = useState<string | null>(null);
+    const [selectedTxId, setSelectedTxId] = useState<string | null>(null);
 
     useEffect(() => {
         if (!isAuthLoading && !isAuthenticated) {
@@ -56,6 +57,101 @@ const History = () => {
             console.error('Failed to copy:', err);
         }
     };
+
+    const formatAmount = (tx: typeof transactions[number]) => {
+        const sign = tx.type === 'sent' ? '-' : '+';
+        if (tx.token === 'XLM') {
+            return `${sign}${tx.amount.toLocaleString(undefined, { maximumFractionDigits: 7 })} XLM`;
+        }
+        return `${sign}$${tx.amount.toFixed(3)}`;
+    };
+
+    const formatAddress = (address?: string) => {
+        if (!address) return 'Unknown';
+        if (address.length <= 16) return address;
+        return `${address.slice(0, 6)}...${address.slice(-6)}`;
+    };
+
+    const selectedTx = transactions.find((tx) => tx.id === selectedTxId) ?? null;
+
+    if (selectedTx) {
+        const txHash = selectedTx.digest || selectedTx.id;
+        const explorerUrl = getStellarExplorerTxUrl(txHash, getConfiguredStellarNetwork());
+
+        return (
+            <div className="app-container">
+                <div className="page-wrapper">
+                    <div className="flex justify-between items-center mb-6">
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setSelectedTxId(null)}
+                                className="p-2 border border-border rounded-xl hover:bg-secondary transition-colors"
+                            >
+                                <ArrowLeft className="w-5 h-5" />
+                            </button>
+                            <h1 className="text-xl font-bold">Transaction Detail</h1>
+                        </div>
+                    </div>
+
+                    <div className="card-modern divide-y divide-border">
+                        <div className="flex justify-between items-center py-3">
+                            <span className="text-muted-foreground text-sm">Status</span>
+                            <span className="text-success font-medium text-sm">Success</span>
+                        </div>
+                        <div className="flex justify-between items-center py-3">
+                            <span className="text-muted-foreground text-sm">Type</span>
+                            <span className="font-medium text-sm">{selectedTx.type === 'sent' ? 'Sent' : 'Received'}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-3">
+                            <span className="text-muted-foreground text-sm">Amount</span>
+                            <span className={`font-semibold text-sm ${selectedTx.type === 'received' ? 'text-success' : 'text-foreground'}`}>
+                                {formatAmount(selectedTx)}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-start py-3 gap-4">
+                            <span className="text-muted-foreground text-sm">{selectedTx.type === 'sent' ? 'To' : 'From'}</span>
+                            <span className="font-mono text-xs text-right break-all">
+                                {selectedTx.type === 'sent' ? selectedTx.to || 'Unknown' : selectedTx.from || 'Unknown'}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-center py-3">
+                            <span className="text-muted-foreground text-sm">Token</span>
+                            <span className="font-medium text-sm">{selectedTx.token}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-3">
+                            <span className="text-muted-foreground text-sm">Time</span>
+                            <span className="font-medium text-sm">{selectedTx.timestamp.toLocaleString('en-GB')}</span>
+                        </div>
+                        <div className="py-3">
+                            <div className="flex justify-between items-center gap-3 mb-2">
+                                <span className="text-muted-foreground text-sm">Transaction hash</span>
+                                <button
+                                    onClick={() => copyDigest(txHash)}
+                                    className="p-1 hover:bg-secondary rounded transition-colors"
+                                >
+                                    {copiedDigest === txHash ? (
+                                        <Check className="w-4 h-4 text-success" />
+                                    ) : (
+                                        <Copy className="w-4 h-4 text-muted-foreground" />
+                                    )}
+                                </button>
+                            </div>
+                            <p className="font-mono text-xs break-all">{txHash}</p>
+                        </div>
+                    </div>
+
+                    <a
+                        href={explorerUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-primary mt-6 block text-center"
+                    >
+                        View on Stellar Explorer
+                    </a>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="app-container">
@@ -101,7 +197,18 @@ const History = () => {
                                     : txHash;
 
                                 return (
-                                    <div key={tx.id} className="flex items-center justify-between py-3">
+                                    <div
+                                        key={tx.id}
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => setSelectedTxId(tx.id)}
+                                        onKeyDown={(event) => {
+                                            if (event.key === 'Enter' || event.key === ' ') {
+                                                setSelectedTxId(tx.id);
+                                            }
+                                        }}
+                                        className="w-full flex items-center justify-between py-3 text-left"
+                                    >
                                         <div className="flex items-center gap-3">
                                             <div className={`icon-circle ${tx.type === 'sent' ? 'bg-secondary' : 'bg-success/10'}`}>
                                                 {tx.type === 'sent'
@@ -120,12 +227,17 @@ const History = () => {
                                                             href={getStellarExplorerTxUrl(txHash, getConfiguredStellarNetwork())}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
+                                                            onClick={(event) => event.stopPropagation()}
                                                             className="text-xs text-muted-foreground font-mono hover:text-foreground hover:underline transition-colors"
                                                         >
                                                             {truncatedHash}
                                                         </a>
                                                         <button
-                                                            onClick={() => copyDigest(txHash)}
+                                                            type="button"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                copyDigest(txHash);
+                                                            }}
                                                             className="p-0.5 hover:bg-secondary rounded transition-colors"
                                                         >
                                                             {copiedDigest === txHash ? (
@@ -137,12 +249,12 @@ const History = () => {
                                                     </div>
                                                 </div>
                                                 <p className="text-xs text-muted-foreground">
-                                                    {tx.type === 'sent' ? `To ${tx.to || 'Unknown'}` : `From ${tx.from || 'Unknown'}`} • {formatTime(tx.timestamp)}
+                                                    {tx.type === 'sent' ? `To ${formatAddress(tx.to)}` : `From ${formatAddress(tx.from)}`} • {formatTime(tx.timestamp)}
                                                 </p>
                                             </div>
                                         </div>
                                         <p className={`font-semibold flex-shrink-0 ${tx.type === 'sent' ? 'text-foreground' : 'text-success'}`}>
-                                            {tx.type === 'sent' ? '−' : '+'}${tx.amount.toFixed(3)}
+                                            {formatAmount(tx)}
                                         </p>
                                     </div>
                                 );
