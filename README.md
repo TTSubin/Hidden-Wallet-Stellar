@@ -1,67 +1,56 @@
 # HiddenWallet Stellar Challenge
 
-HiddenWallet is a Stellar-based payment wallet that connects to Freighter, displays Stellar balances, and lets users send testnet XLM or Stellar USDC. The app also keeps the existing off-ramp flow shape for crypto-to-fiat payments while using Stellar addresses and Horizon-backed transaction handling.
+HiddenWallet Stellar Challenge is a Stellar testnet wallet and off-ramp demo. It connects to Freighter, authenticates users with a Stellar wallet signature, displays XLM and USDC balances through Horizon, sends testnet XLM/USDC transactions, and shows transaction feedback plus history/detail views.
+
+The backend keeps the existing order/off-ramp API shape, but Stellar payments are verified with Horizon transaction data.
 
 ## Features
 
-- Connect a Stellar wallet with Freighter.
-- Authenticate with Stellar wallet message signing.
-- Display XLM and USDC balances from Stellar Horizon.
-- Send XLM transactions on Stellar testnet.
-- Show transaction success or failure feedback to the user.
-- Display the submitted transaction hash after a successful testnet transaction.
-- Support USDC payment and off-ramp order confirmation flows.
+- Connect and disconnect Freighter wallet.
+- Sign in with a Stellar wallet message.
+- Display XLM balance and Stellar USDC trustline balance.
+- Send XLM on Stellar testnet.
+- Send Stellar USDC when the recipient has the matching USDC trustline.
+- Show `Transaction success` with a `Click here to see` explorer link after a successful transaction.
+- Show failure messages for common Stellar errors, including missing recipient trustline.
+- Show transaction history; XLM rows display amounts like `-2 XLM`, while USDC rows keep the existing dollar-style design.
+- Open a transaction detail screen by clicking any history item.
+- Confirm off-ramp payment orders with a Stellar transaction hash.
 
 ## Tech Stack
 
 - Frontend: React, TypeScript, Vite, Tailwind CSS
-- Wallet: Freighter (`@stellar/freighter-api`)
-- Blockchain: Stellar SDK and Horizon (`@stellar/stellar-sdk`)
+- Wallet: Freighter via `@stellar/freighter-api`
+- Blockchain: Stellar SDK and Horizon via `@stellar/stellar-sdk`
 - Backend: NestJS, Prisma, PostgreSQL
 - API docs: Swagger
+- Docker: PostgreSQL, backend, frontend
 
 ## Prerequisites
 
 - Node.js 22 or newer
 - npm
-- PostgreSQL for backend features
-- Docker and Docker Compose for containerized local runs
+- Docker Desktop and Docker Compose, if running with Docker
+- PostgreSQL, if running the backend directly on your machine
 - Freighter browser extension
 - A funded Stellar testnet account
 
-You can fund a testnet account from the Stellar Laboratory Friendbot or another Stellar testnet faucet.
+For testnet XLM, fund your account with Stellar Laboratory Friendbot or another Stellar testnet faucet. In Freighter, make sure the selected network is `Testnet`.
 
-## Setup Instructions
+## Environment Variables
 
-### 1. Clone and Install
+### Backend
 
-```bash
-git clone <repository-url>
-cd Stellar-challenge
-```
-
-Install frontend dependencies:
-
-```bash
-cd frontend
-npm install
-```
-
-Install backend dependencies:
-
-```bash
-cd ../backend
-npm install
-```
-
-### 2. Configure Backend Environment
-
-Create `backend/.env` and fill in the local database, Stellar, JWT, and partner payment settings.
+Create `backend/.env` from `backend/.env.example`.
 
 ```env
-DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/hiddenwallet"
-JWT_SECRET=replace-with-a-secure-secret
-JWT_EXPIRES_IN=1d
+PORT=3000
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/hiddenwallet_testnet?schema=public
+
+JWT_SECRET=dev_secret_change_me
+JWT_EXPIRES_IN=7d
+AUTH_DOMAIN=http://localhost:5173
+AUTH_CHALLENGE_TTL_SECONDS=300
 
 STELLAR_NETWORK=TESTNET
 STELLAR_HORIZON_URL=https://horizon-testnet.stellar.org
@@ -70,33 +59,21 @@ STELLAR_USDC_ASSET_ISSUER=<testnet-usdc-issuer-public-key>
 STELLAR_USDC_DECIMALS=7
 PARTNER_STELLAR_ADDRESS=<partner-stellar-public-key>
 
+GAIAN_PAYMENT_BASE_URL=https://dev-payments.gaian-dev.network
+GAIAN_USER_BASE_URL=https://user.gaian-dev.network
+GAIAN_QR_BASE_URL=https://payments.gaian-dev.network
 GAIAN_API_KEY=<optional-gaian-api-key>
-GAIAN_BASE_URL=<optional-gaian-base-url>
-PAYOUT_FEE_PERCENT=2
+GAIAN_QR_API_KEY=<optional-gaian-qr-api-key>
 ```
 
-Generate Prisma client and run migrations:
+`PARTNER_STELLAR_ADDRESS` is the merchant/partner Stellar address that receives USDC for off-ramp orders. The backend uses it when verifying that a user paid the correct destination.
 
-```bash
-cd backend
-npm run prisma:generate
-npx prisma migrate dev
-```
+### Frontend
 
-Start the backend:
-
-```bash
-npm run start:dev
-```
-
-The backend runs at `http://localhost:3000` and Swagger docs are available at `http://localhost:3000/api`.
-
-### 3. Configure Frontend Environment
-
-Create `frontend/.env`:
+Create `frontend/.env` from `frontend/.env.example`.
 
 ```env
-VITE_API_URL=http://localhost:3000
+VITE_API_URL=http://localhost:3000/api
 VITE_STELLAR_NETWORK=TESTNET
 VITE_STELLAR_HORIZON_URL=https://horizon-testnet.stellar.org
 VITE_STELLAR_USDC_ASSET_CODE=USDC
@@ -104,68 +81,113 @@ VITE_STELLAR_USDC_ASSET_ISSUER=<testnet-usdc-issuer-public-key>
 VITE_STELLAR_USDC_DECIMALS=7
 ```
 
-Start the frontend:
+Important: `STELLAR_USDC_ASSET_ISSUER` and `VITE_STELLAR_USDC_ASSET_ISSUER` define which USDC asset this app uses. The recipient must still add a USDC trustline for that exact issuer in Freighter, and the recipient account needs enough testnet XLM to create the trustline.
+
+## Run Locally
+
+### Backend
+
+```bash
+cd backend
+npm install
+cp .env.example .env
+npm run prisma:generate
+npm run prisma:migrate
+npm run start:dev
+```
+
+Backend:
+
+- API base URL: `http://localhost:3000/api`
+- Swagger docs: `http://localhost:3000/api`
+
+### Frontend
 
 ```bash
 cd frontend
+npm install
+cp .env.example .env
 npm run dev
 ```
 
-Open the Vite local URL, usually `http://localhost:5173`.
+Frontend:
 
-## Run with Docker
+- App URL: `http://localhost:5173`
 
-This repository includes Docker files for a local Stellar testnet stack:
+## Run With Docker
 
-- PostgreSQL testnet database
-- NestJS backend API
-- React frontend served by Nginx
-
-Create a local Docker env file:
+Create the Docker env file:
 
 ```bash
 cp .env.docker.example .env
 ```
 
-Update `.env` if you need Stellar USDC/off-ramp support:
+Fill these values in `.env` before using USDC or off-ramp flows:
 
 ```env
 STELLAR_USDC_ASSET_ISSUER=<testnet-usdc-issuer-public-key>
 PARTNER_STELLAR_ADDRESS=<partner-stellar-public-key>
-GAIAN_API_KEY=<optional-gaian-api-key>
-GAIAN_PAYMENT_BASE_URL=<optional-gaian-payment-url>
+GAIAN_PAYMENT_BASE_URL=https://dev-payments.gaian-dev.network
+GAIAN_USER_BASE_URL=https://user.gaian-dev.network
+GAIAN_QR_BASE_URL=https://payments.gaian-dev.network
 ```
 
 Start the full stack:
 
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
 Open:
 
 - Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:3000/api`
+- Backend / Swagger: `http://localhost:3000/api`
 - PostgreSQL: `localhost:5432`
 
-The Docker backend uses `STELLAR_NETWORK=TESTNET`, `https://horizon-testnet.stellar.org`, and runs `prisma db push` on startup to sync the local testnet database schema.
+Useful Docker commands:
 
-## Local Testnet Transaction Flow
+```bash
+docker compose ps
+docker compose logs -f backend
+docker compose logs -f frontend
+docker compose down
+```
 
-1. Open the app locally.
-2. Connect Freighter and select Stellar testnet.
-3. Make sure the connected account has testnet XLM.
-4. Go to Send.
+The Docker backend syncs the Prisma schema on startup with `prisma db push`.
+
+## Transaction Flow
+
+### Send XLM On Testnet
+
+1. Open `http://localhost:5173`.
+2. Connect Freighter.
+3. Select the Stellar testnet account in Freighter.
+4. Go to `Send`.
 5. Choose `XLM Testnet`.
 6. Enter a recipient Stellar public key that starts with `G`.
 7. Enter the XLM amount.
-8. Confirm and approve the transaction in Freighter.
-9. The app shows success or failure feedback.
-10. On success, the app displays the Stellar transaction hash.
+8. Confirm in Freighter.
+9. The app shows `Transaction success` and a `Click here to see` link to the transaction explorer.
+
+### Send USDC On Testnet
+
+1. Configure the same USDC issuer in backend and frontend env files.
+2. Make sure the sender has that USDC asset.
+3. Make sure the recipient has a USDC trustline for that exact issuer.
+4. Send from the app and approve in Freighter.
+
+If the recipient has not added the trustline, the app shows: `Recipient has not added a USDC trustline for this Stellar issuer`.
+
+### Transaction History
+
+- XLM payments show native amounts, for example `-2 XLM`.
+- USDC payments keep the existing dollar-style amount display.
+- Long addresses are shortened in the list to the first 6 and last 6 characters.
+- Click any history row to open the transaction detail view.
 
 ## Screenshots
 
-Add the challenge screenshots to `docs/screenshots/` using the filenames below.
+Add the required challenge screenshots to `docs/screenshots/` with these filenames.
 
 ### Wallet Connected State
 
@@ -179,11 +201,11 @@ Add the challenge screenshots to `docs/screenshots/` using the filenames below.
 
 ![Successful testnet transaction](docs/screenshots/successful-testnet-transaction.png)
 
-### Transaction Result Shown to the User
+### Transaction Result Shown To The User
 
 ![Transaction result shown to the user](docs/screenshots/transaction-result.png)
 
-## Useful Commands
+## Verification Commands
 
 Frontend:
 
@@ -201,8 +223,10 @@ cd backend
 npm run build
 ```
 
-## Notes
+## Troubleshooting
 
-- The XLM transaction flow is intentionally restricted to Stellar testnet.
-- Freighter is the primary wallet connector and signer.
-- USDC issuer addresses are configured through environment variables instead of being hardcoded.
+- `INVALID_SIGNATURE`: clear the app session/local storage, reconnect Freighter, make sure Freighter is signing for the same account shown in the app, then sign in again.
+- `Recipient has not added a USDC trustline`: add the configured USDC issuer as a trustline in the recipient Freighter account.
+- `Gaian registerUser failed: Route ... not found`: use `GAIAN_USER_BASE_URL=https://user.gaian-dev.network`, not the payment base URL.
+- Docker Hub TLS timeout while pulling Nginx: retry the build or run `docker pull nginx:1.27-alpine` after Docker/network is stable.
+- Docker API `502 Bad Gateway`: restart or update Docker Desktop, then run `docker compose up -d --build` again.
