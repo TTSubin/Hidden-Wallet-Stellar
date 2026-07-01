@@ -117,7 +117,7 @@ type WalletContextType = WalletState & {
   connect: () => Promise<string>;
   signAuthMessage: (message: string) => Promise<string>;
   setUsername: (username: string) => void;
-  sendUsdc: (toAddress: string, amount: number) => Promise<{ success: boolean; digest?: string }>;
+  sendUsdc: (toAddress: string, amount: number) => Promise<{ success: boolean; digest?: string; message?: string }>;
   sendXlm: (toAddress: string, amount: number) => Promise<{ success: boolean; digest?: string; message?: string }>;
   disconnect: () => void;
   addBankAccount: (bank: Omit<LinkedBank, 'id'>) => void;
@@ -139,6 +139,41 @@ const USDC_TO_VND_RATE = 25500;
 function rawUnits(amount: string, decimals: number) {
   const [whole, fraction = ''] = amount.split('.');
   return (BigInt(whole) * BigInt(10 ** decimals) + BigInt(fraction.padEnd(decimals, '0') || '0')).toString();
+}
+
+function getUsdcBalance(balances: HorizonAccountBalance[]) {
+  const balance = balances.find((item) =>
+    item.asset_code === USDC_ASSET_CODE &&
+    (!USDC_ASSET_ISSUER || item.asset_issuer === USDC_ASSET_ISSUER),
+  );
+  return balance ? Number(balance.balance) : 0;
+}
+
+function hasUsdcTrustline(balances: HorizonAccountBalance[]) {
+  return balances.some((item) =>
+    item.asset_code === USDC_ASSET_CODE &&
+    (!USDC_ASSET_ISSUER || item.asset_issuer === USDC_ASSET_ISSUER),
+  );
+}
+
+function getStellarSubmitErrorMessage(error: unknown) {
+  const response = (error as { response?: { data?: { extras?: { result_codes?: { transaction?: string; operations?: string[] } } } } })?.response;
+  const resultCodes = response?.data?.extras?.result_codes;
+  const operationCode = resultCodes?.operations?.find(Boolean);
+  const transactionCode = resultCodes?.transaction;
+
+  switch (operationCode) {
+    case 'op_no_trust':
+      return 'Recipient has not added a USDC trustline for this Stellar issuer.';
+    case 'op_underfunded':
+      return 'Insufficient USDC balance.';
+    case 'op_no_destination':
+      return 'Recipient Stellar account does not exist on this network.';
+    case 'op_line_full':
+      return 'Recipient USDC trustline limit is full.';
+    default:
+      return operationCode || transactionCode || (error instanceof Error ? error.message : 'Failed to send USDC transaction');
+  }
 }
 
 function freighterSignatureToBase64(value: unknown): string {
@@ -333,12 +368,31 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     return freighterSignatureToBase64(res.signedMessage);
   };
 
-  const sendUsdc = async (toAddress: string, amount: number): Promise<{ success: boolean; digest?: string }> => {
-    if (!walletAddress || !isValidWalletAddress(toAddress) || !USDC_ASSET_ISSUER) return { success: false };
+  const sendUsdc = async (toAddress: string, amount: number): Promise<{ success: boolean; digest?: string; message?: string }> => {
+    if (!walletAddress) return { success: false, message: 'No wallet connected' };
+    if (!isValidWalletAddress(toAddress)) return { success: false, message: 'Invalid Stellar recipient address' };
+    if (!USDC_ASSET_ISSUER) return { success: false, message: 'USDC issuer is not configured' };
+    if (!Number.isFinite(amount) || amount <= 0) return { success: false, message: 'Invalid USDC amount' };
 
     try {
       const server = new Horizon.Server(HORIZON_URL);
       const source = await server.loadAccount(walletAddress);
+      const sourceUsdcBalance = getUsdcBalance(source.balances as HorizonAccountBalance[]);
+      if (sourceUsdcBalance < amount) {
+        return { success: false, message: 'Insufficient USDC balance' };
+      }
+
+      let destination;
+      try {
+        destination = await server.loadAccount(toAddress);
+      } catch {
+        return { success: false, message: 'Recipient Stellar account does not exist on this network' };
+      }
+
+      if (!hasUsdcTrustline(destination.balances as HorizonAccountBalance[])) {
+        return { success: false, message: 'Recipient has not added a USDC trustline for this Stellar issuer' };
+      }
+
       const asset = new Asset(USDC_ASSET_CODE, USDC_ASSET_ISSUER);
       const tx = new TransactionBuilder(source, {
         fee: BASE_FEE,
@@ -379,8 +433,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setTimeout(() => refreshBalance(), 2000);
       return { success: true, digest: result.hash };
     } catch (error) {
+      const message = getStellarSubmitErrorMessage(error);
       console.error('Failed to send USDC on Stellar:', error);
-      return { success: false };
+      return { success: false, message };
     }
   };
 
