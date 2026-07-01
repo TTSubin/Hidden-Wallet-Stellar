@@ -1,0 +1,29 @@
+node_modules
+/dist
+/build
+/coverage
+/.cache
+/.vscode
+/.idea
+
+# env
+.env
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# prisma
+prisma/migrations
+
+# OS
+.DS_Store
+Thumbs.db
+
+#Other
+zklogin-data/*.zkey
+zklogin-data/*.vkey
+zklogin-ceremony-contributions/
+FE

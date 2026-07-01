@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16
+    container_name: stellar_payment_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: stellar_payment
+    ports:
+      - "5432:5432"
+    volumes:
+      - stellar_payment_pgdata:/var/lib/postgresql/data
+
+volumes:
+  stellar_payment_pgdata:
+
+networks:
+  stellar-payment-network:
+    driver: bridge

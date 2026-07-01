@@ -1,0 +1,181 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String           @id @default(uuid()) @db.Uuid
+  username          String?          @unique
+  walletAddress     String           @map("wallet_address")
+  email             String?
+  kycStatus         String           @default("not started") @map("kyc_status")
+  firstName         String?          @map("first_name")
+  lastName          String?          @map("last_name")
+  referrerId        String?          @map("referrer_id") @db.Uuid
+  loyaltyPoints     Float            @default(0) @map("loyalty_points")
+  commissionBalance Float            @default(0) @map("commission_balance")
+  isActive          Boolean          @default(true) @map("is_active")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  contacts          Contact[]
+  offchainWallets   OffchainWallet[]
+  onchainWallets    OnchainWallet[]
+  referrer          User?            @relation("UserReferral", fields: [referrerId], references: [id])
+  referees          User[]           @relation("UserReferral")
+
+  @@index([referrerId])
+  @@map("users")
+}
+
+model OnchainWallet {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  address        String
+  chain          String
+  label          String?
+  walletProvider String?  @map("wallet_provider")
+  kycStatus      String   @default("not started") @map("kyc_status")
+  isDefault      Boolean  @default(false) @map("is_default")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chain, address])
+  @@index([userId])
+  @@index([isDefault])
+  @@map("onchain_wallets")
+}
+
+model OffchainWallet {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  country       String
+  bankBin       String   @map("bank_bin")
+  bankName      String   @map("bank_name")
+  accountNumber String   @map("account_number")
+  accountName   String   @map("account_name")
+  label         String?
+  qrString      String   @map("qr_string")
+  qrParsedData  Json?    @map("qr_parsed_data")
+  isDefault     Boolean  @default(false) @map("is_default")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([country, bankBin, accountNumber])
+  @@index([userId])
+  @@index([isDefault])
+  @@map("offchain_wallets")
+}
+
+model Contact {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  recipientUsername String    @map("recipient_username")
+  recipientUserId   String?   @map("recipient_user_id") @db.Uuid
+  label             String?
+  lastTransferAt    DateTime? @map("last_transfer_at")
+  transferCount     Int       @default(0) @map("transfer_count")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, recipientUsername])
+  @@index([userId])
+  @@map("contacts")
+}
+
+model PaymentTarget {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  qrString     String
+  fiatCurrency String
+  isActive     Boolean  @default(true)
+  displayName  String?
+  country      String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  orders       Order[]
+
+  @@map("payment_targets")
+}
+
+model Order {
+  id                           String              @id @default(cuid())
+  gaianOrderId                 String?             @unique
+  username                     String?
+  paymentTargetId              String?
+  payerWalletAddress           String
+  partnerWalletAddress         String
+  cryptoCurrency               String
+  coinType                     String
+  expectedCryptoAmountRaw      String
+  userPaymentTxDigest          String?
+  userPaymentVerifiedAt        DateTime?
+  fiatAmount                   Decimal             @db.Decimal(18, 2)
+  fiatCurrency                 String
+  hiddenWalletFeeRate          Decimal?            @db.Decimal(9, 6)
+  hiddenWalletFeeAmountRaw     String?
+  hiddenWalletFeeAmount        Decimal?            @db.Decimal(18, 6)
+  status                       OrderStatus         @default(AWAITING_USER_PAYMENT)
+  bankTransferStatus           BankTransferStatus?
+  bankTransactionReference     Json?
+  exchangeRate                 Decimal?            @db.Decimal(18, 8)
+  gaianRaw                     Json?
+  clientRequestId              String?
+  createdAt                    DateTime            @default(now())
+  updatedAt                    DateTime            @updatedAt
+  qrString                     String?             @map("qr_string")
+  recipientAccountName         String?             @map("recipient_account_name")
+  recipientAccountNumber       String?             @map("recipient_account_number")
+  recipientBankName            String?             @map("recipient_bank_name")
+  order_type                   String              @default("REGULAR")
+  user_id                      String?             @db.Uuid
+  payoutFeeRate              Decimal?            @map("payout_fee_rate") @db.Decimal(9, 6)
+  payoutFeeAmountFiat         Decimal?            @map("payout_fee_amount_fiat") @db.Decimal(18, 2)
+  payoutFeeBaseFiatAmount     Decimal?            @map("payout_fee_base_fiat_amount") @db.Decimal(18, 2)
+  payoutFeeFinalFiatAmount    Decimal?            @map("payout_fee_final_fiat_amount") @db.Decimal(18, 2)
+  paymentTarget                PaymentTarget?      @relation(fields: [paymentTargetId], references: [id])
+
+  @@unique([payerWalletAddress, clientRequestId])
+  @@index([payerWalletAddress])
+  @@index([status])
+  @@map("orders")
+}
+
+model AuthNonce {
+  id        String    @id @default(cuid())
+  address   String
+  nonce     String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([address, nonce])
+  @@index([address])
+  @@index([expiresAt])
+  @@map("auth_nonces")
+}
+
+enum OrderStatus {
+  AWAITING_USER_PAYMENT
+  USER_PAYMENT_VERIFIED
+  CONFIRMING_GAIAN_PAYMENT
+  CONFIRMED_GAIAN_PAYMENT
+  COMPLETED
+  FAILED
+  PENDING
+}
+
+enum BankTransferStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
