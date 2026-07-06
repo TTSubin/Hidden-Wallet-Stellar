@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useMemo, useState } from 'react';
 import { ArrowUpRight, ArrowDownLeft, Eye, EyeOff, Copy, Check, Users, Award, Trophy, Crown, Settings } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatTransactionAmount } from '@/lib/transactions';
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -350,7 +351,7 @@ const Dashboard = () => {
                                         </div>
                                     </div>
                                     <p className={`font-semibold ${tx.type === 'sent' ? '' : 'text-success'}`}>
-                                        {tx.type === 'sent' ? '−' : '+'}{tx.amount.toFixed(3)}
+                                        {formatTransactionAmount(tx)}
                                     </p>
                                 </div>
                             ))

@@ -4,6 +4,7 @@ import { useWallet } from '@/context/WalletContext';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowDownLeft, ArrowUpRight, RefreshCw, Copy, Check } from 'lucide-react';
 import { getConfiguredStellarNetwork, getStellarExplorerTxUrl } from '@/lib/stellar';
+import { formatTransactionAmount } from '@/lib/transactions';
 
 const History = () => {
     const navigate = useNavigate();
@@ -59,11 +60,7 @@ const History = () => {
     };
 
     const formatAmount = (tx: typeof transactions[number]) => {
-        const sign = tx.type === 'sent' ? '-' : '+';
-        if (tx.token === 'XLM') {
-            return `${sign}${tx.amount.toLocaleString(undefined, { maximumFractionDigits: 7 })} XLM`;
-        }
-        return `${sign}$${tx.amount.toFixed(3)}`;
+        return formatTransactionAmount(tx);
     };
 
     const formatAddress = (address?: string) => {

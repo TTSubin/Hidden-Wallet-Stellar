@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '@/context/WalletContext';
 import { useAuth } from '@/context/AuthContext';
-import { checkUsername, postOnboarding, postRegister } from '@/services/api';
+import { checkUsername, getApiErrorMessage, postOnboarding, postRegister } from '@/services/api';
 import { toast } from 'sonner';
 import { Mail, Users } from 'lucide-react';
 
@@ -112,8 +112,7 @@ const Onboarding = () => {
         navigate('/dashboard');
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Onboarding failed';
-      setError(message);
+      setError(getApiErrorMessage(err, 'Onboarding failed'));
     } finally {
       setIsChecking(false);
     }

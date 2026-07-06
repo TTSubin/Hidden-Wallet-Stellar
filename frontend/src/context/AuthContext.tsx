@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { getChallenge, getKycStatus, getProfile, postVerify, WalletChallengeResponseDto } from '@/services/api';
 import { useWallet } from './WalletContext';
+import { getAuthUserWalletAddress, isWalletSessionMismatch } from './authWalletSession';
 
 type AuthUser = unknown;
 
@@ -67,16 +68,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const res = await getProfile();
 
-        const walletAddressForKyc = (() => {
-          const u = res.data as { walletAddress?: unknown; address?: unknown } | null;
-          const addr =
-            typeof u?.walletAddress === 'string' && u.walletAddress.trim()
-              ? u.walletAddress.trim()
-              : typeof u?.address === 'string' && u.address.trim()
-                ? u.address.trim()
-                : null;
-          return addr;
-        })();
+        if (isWalletSessionMismatch(walletAddress, res.data)) {
+          if (cancelled) return;
+          localStorage.removeItem(TOKEN_STORAGE_KEY);
+          setToken(null);
+          setUser(null);
+          return;
+        }
+
+        const walletAddressForKyc = getAuthUserWalletAddress(res.data);
 
         if (walletAddressForKyc) {
           try {

@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useWallet } from '@/context/WalletContext';
 import { Scan, Check, AlertTriangle, ChevronDown, Wallet, Building2, Loader2, X, User, AlertCircle, CreditCard, Copy } from 'lucide-react';
 import QRScanner from '@/components/QRScanner';
-import { createPaymentOrder, confirmPaymentOrder, getPaymentOrder, syncPaymentOrder, lookupUser, scanQr, getDefaultPaymentMethod, paymentsQuote } from '@/services/api';
+import { createPaymentOrder, confirmPaymentOrder, getApiErrorCode, getApiErrorMessage, getPaymentOrder, syncPaymentOrder, lookupUser, scanQr, getDefaultPaymentMethod, paymentsQuote } from '@/services/api';
 import { getConfiguredStellarNetwork, getStellarExplorerTxUrl, getTransactionFeedbackMessage } from '@/lib/stellar';
 import {
   AlertDialog,
@@ -109,8 +109,8 @@ const Send = () => {
       } else {
         setRateError('Invalid quote');
       }
-    } catch {
-      setRateError('Failed to fetch quote');
+    } catch (err) {
+      setRateError(getApiErrorMessage(err, 'Failed to fetch quote'));
     } finally {
       setIsFetchingRate(false);
     }
@@ -362,7 +362,7 @@ const Send = () => {
         setRecipientValid(false);
         setRecipientAddress(null);
         setRecipientType('none');
-        setError('User not found');
+        setError(getApiErrorMessage(err, 'User not found'));
       }
     } finally {
       setIsChecking(false);
@@ -519,7 +519,7 @@ const Send = () => {
     } catch (err) {
       console.error('QR parsing error:', err);
       setScanResult('error');
-      setError('Invalid QR Code');
+      setError(getApiErrorMessage(err, 'Invalid QR Code'));
     } finally {
       setIsParsing(false);
     }
@@ -578,9 +578,11 @@ const Send = () => {
         });
       } catch (err: unknown) {
         console.error('Failed to get quote:', err);
-        const message = (err as { response?: { data?: { message?: unknown } } })?.response?.data?.message;
-        const errorMsg = typeof message === 'string' ? message.toLowerCase() : '';
+        const errorCode = getApiErrorCode(err)?.toLowerCase() ?? '';
+        const errorMsg = getApiErrorMessage(err, 'Failed to get exchange rate').toLowerCase();
         const needsKyc =
+          errorCode.includes('kyc') ||
+          errorCode.includes('amount') ||
           errorMsg.includes('kyc_required') ||
           errorMsg.includes('kyc required') ||
           errorMsg.includes('kyc') ||
@@ -591,9 +593,9 @@ const Send = () => {
           errorMsg.includes('amount_per');
 
         if (needsKyc) {
-          openKycPopup('KYC verification required for this transaction');
+          openKycPopup(getApiErrorMessage(err, 'KYC verification required for this transaction'));
         } else {
-          setError('Failed to get exchange rate');
+          setError(getApiErrorMessage(err, 'Failed to get exchange rate'));
         }
         return;
       }
@@ -682,7 +684,7 @@ const Send = () => {
           console.error('Failed to confirm payment order:', confirmError);
           // Transaction succeeded but confirmation failed
           // User still gets their money, just backend tracking failed
-          setError('Transaction succeeded but confirmation failed. Please contact support with transaction: ' + result.digest);
+          setError(`${getApiErrorMessage(confirmError, 'Transaction succeeded but confirmation failed')}. Please contact support with transaction: ${result.digest}`);
           setStep('error');
           return;
         }
@@ -718,7 +720,7 @@ const Send = () => {
       }
     } catch (err) {
       console.error('Send error:', err);
-      setError(err instanceof Error ? err.message : 'Transaction failed');
+      setError(getApiErrorMessage(err, 'Transaction failed'));
       setStep('error');
     }
   };

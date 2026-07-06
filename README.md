@@ -1,21 +1,30 @@
-# HiddenWallet Stellar Challenge
+# HiddenWallet Hybrid Payment Platform
 
-HiddenWallet Stellar Challenge is a Stellar testnet wallet and off-ramp demo. It connects to Freighter, authenticates users with a Stellar wallet signature, displays XLM and USDC balances through Horizon, sends testnet XLM/USDC transactions, and shows transaction feedback plus history/detail views.
+## Project Description
 
-The backend keeps the existing order/off-ramp API shape, but Stellar payments are verified with Horizon transaction data.
+HiddenWallet is a hybrid payment platform that bridges decentralized finance on Stellar and traditional fiat payment systems. It is designed for seamless cross-border payments: a user pays with cryptocurrency, such as Stellar USDC, and the recipient receives fiat currency, such as VND or PHP, in their bank account.
 
-## Features
+The system manages the full payment order lifecycle, from quote generation to final settlement. It integrates with external services for real-time exchange rates and payment execution, while the backend handles user authentication, profile management, linked wallets, linked bank accounts, referrals, commissions, and order verification.
 
-- Connect and disconnect Freighter wallet.
-- Sign in with a Stellar wallet message.
-- Display XLM balance and Stellar USDC trustline balance.
-- Send XLM on Stellar testnet.
-- Send Stellar USDC when the recipient has the matching USDC trustline.
-- Show `Transaction success` with a `Click here to see` explorer link after a successful transaction.
-- Show failure messages for common Stellar errors, including missing recipient trustline.
-- Show transaction history; XLM rows display amounts like `-2 XLM`, while USDC rows keep the existing dollar-style design.
-- Open a transaction detail screen by clicking any history item.
-- Confirm off-ramp payment orders with a Stellar transaction hash.
+This repository includes the Stellar testnet challenge implementation. The current demo connects Freighter, displays XLM and USDC balances, submits testnet transactions, shows the transaction result to the user, and provides a transaction detail view with a Stellar Explorer link.
+
+## Key Features
+
+- Hybrid payment processing: manages orders that convert Stellar USDC payments into fiat bank payouts.
+- Stellar wallet authentication: authenticates users with Freighter by signing a Stellar wallet challenge.
+- Freighter wallet connection: connects and disconnects Stellar testnet accounts through Freighter.
+- User and wallet management: manages user profiles, on-chain Stellar wallets, and off-chain bank accounts.
+- Username payments: lets users claim a unique `@username` for easier transfers.
+- Send XLM: sends native XLM on Stellar testnet.
+- Send USDC: sends Stellar USDC when the recipient has the configured issuer trustline.
+- QR payments: scans VietQR codes through the camera for faster checkout.
+- Bank linking: links bank accounts by scanning payment QR codes.
+- Dynamic quoting: provides crypto-to-fiat quotes with platform fees.
+- External service integration: connects with the Gaian API for exchange rates and payment execution.
+- Referral and commission system: rewards users for referred transaction activity.
+- Database management: uses Prisma ORM with PostgreSQL.
+- API documentation: exposes interactive Swagger/OpenAPI documentation.
+- Testnet transaction proof: sends XLM and USDC on testnet, then shows success and transaction details to the user.
 
 ## Tech Stack
 
@@ -83,7 +92,7 @@ VITE_STELLAR_USDC_DECIMALS=7
 
 Important: `STELLAR_USDC_ASSET_ISSUER` and `VITE_STELLAR_USDC_ASSET_ISSUER` define which USDC asset this app uses. The recipient must still add a USDC trustline for that exact issuer in Freighter, and the recipient account needs enough testnet XLM to create the trustline.
 
-## Run Locally
+## Setup Instructions
 
 ### Backend
 
@@ -157,24 +166,51 @@ The Docker backend syncs the Prisma schema on startup with `prisma db push`.
 
 ## Transaction Flow
 
-### Send XLM On Testnet
+### XLM Testnet Flow
 
-1. Open `http://localhost:5173`.
-2. Connect Freighter.
-3. Select the Stellar testnet account in Freighter.
-4. Go to `Send`.
-5. Choose `XLM Testnet`.
-6. Enter a recipient Stellar public key that starts with `G`.
-7. Enter the XLM amount.
-8. Confirm in Freighter.
-9. The app shows `Transaction success` and a `Click here to see` link to the transaction explorer.
+Use this flow to prove a native Stellar testnet payment from one Freighter account to another.
 
-### Send USDC On Testnet
+1. Fund the sender account with testnet XLM from Stellar Laboratory Friendbot or another testnet faucet.
+2. Fund the recipient account with enough testnet XLM to exist on Stellar testnet.
+3. Open `http://localhost:5173`.
+4. Connect Freighter.
+5. Select the sender account in Freighter and make sure the Freighter network is `Testnet`.
+6. Go to `Send`.
+7. Choose `XLM Testnet`.
+8. Enter a recipient Stellar public key that starts with `G`.
+9. Enter the XLM amount.
+10. Review the network fee and destination.
+11. Confirm the transaction in Freighter.
+12. The app submits a native Stellar payment through Horizon.
+13. The app shows `Transaction success` with a `Click here to see` explorer link.
+14. Open the explorer link and verify the transaction on Stellar testnet.
+15. Open transaction history in the app and verify the row displays a native amount such as `-2 XLM`.
 
-1. Configure the same USDC issuer in backend and frontend env files.
-2. Make sure the sender has that USDC asset.
-3. Make sure the recipient has a USDC trustline for that exact issuer.
-4. Send from the app and approve in Freighter.
+### USDC Testnet Flow
+
+Use this flow to prove a Stellar issued-asset payment on testnet. The app uses the USDC issuer configured in the backend and frontend env files.
+
+1. Configure the same USDC issuer in both env files:
+   - Backend: `STELLAR_USDC_ASSET_ISSUER`
+   - Frontend: `VITE_STELLAR_USDC_ASSET_ISSUER`
+2. Make sure the sender account has testnet XLM for fees.
+3. Add the configured USDC trustline to the sender account.
+4. Mint or receive the configured testnet USDC asset into the sender account.
+5. Make sure the recipient account exists on Stellar testnet and has enough XLM to hold trustlines.
+6. Add the same configured USDC trustline to the recipient account.
+7. Open `http://localhost:5173`.
+8. Connect Freighter.
+9. Select the sender account in Freighter and make sure the Freighter network is `Testnet`.
+10. Go to `Send`.
+11. Choose `USDC`.
+12. Enter the recipient Stellar public key that starts with `G`.
+13. Enter the USDC amount.
+14. Review the network fee, issuer-backed USDC asset, and destination.
+15. Confirm the transaction in Freighter.
+16. The app submits a Stellar credit asset payment through Horizon.
+17. The app shows `Transaction success` with a `Click here to see` explorer link.
+18. Open the explorer link and verify the transaction asset is `USDC` from the configured issuer.
+19. Open transaction history in the app and verify the row keeps the dollar-style USDC amount display.
 
 If the recipient has not added the trustline, the app shows: `Recipient has not added a USDC trustline for this Stellar issuer`.
 
@@ -187,7 +223,7 @@ If the recipient has not added the trustline, the app shows: `Recipient has not 
 
 ## Screenshots
 
-Add the required challenge screenshots to `docs/screenshots/` with these filenames.
+The required challenge screenshots are stored in `docs/screenshots/`.
 
 ### Wallet Connected State
 
@@ -199,11 +235,23 @@ Add the required challenge screenshots to `docs/screenshots/` with these filenam
 
 ### Successful Testnet Transaction
 
-![Successful testnet transaction](docs/screenshots/successful-testnet-transaction.png)
+USDC testnet transaction detail:
+
+![Successful USDC testnet transaction](docs/screenshots/usdc-transaction-detail.png)
+
+XLM testnet transaction detail:
+
+![Successful XLM testnet transaction](docs/screenshots/xlm-transaction-detail.png)
 
 ### Transaction Result Shown To The User
 
-![Transaction result shown to the user](docs/screenshots/transaction-result.png)
+USDC result shown after submission:
+
+![USDC transaction result shown to the user](docs/screenshots/usdc-transaction-result.png)
+
+XLM result shown after submission:
+
+![XLM transaction result shown to the user](docs/screenshots/xlm-transaction-result.png)
 
 ## Verification Commands
 

@@ -11,6 +11,84 @@ const api = axios.create({
 
 type ApiEnvelope<T> = T | { data: T } | { result: T };
 
+export type ApiErrorInfo = {
+  status?: number;
+  code?: string;
+  message: string;
+  details?: unknown;
+};
+
+type ErrorPayload = {
+  errorCode?: unknown;
+  error_code?: unknown;
+  code?: unknown;
+  message?: unknown;
+  details?: unknown;
+  error?: unknown;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object';
+
+const getFirstMessage = (message: unknown): string | undefined => {
+  if (typeof message === 'string' && message.trim()) return message;
+  if (Array.isArray(message)) {
+    const first = message.find((item): item is string => typeof item === 'string' && item.trim().length > 0);
+    return first;
+  }
+  return undefined;
+};
+
+const getErrorPayload = (error: unknown): ErrorPayload | undefined => {
+  if (!isRecord(error)) return undefined;
+  const response = isRecord(error.response) ? error.response : undefined;
+  const data = response && isRecord(response.data) ? response.data : undefined;
+  return data as ErrorPayload | undefined;
+};
+
+export const toApiError = (error: unknown, fallbackMessage = 'Something went wrong. Please try again.'): ApiErrorInfo => {
+  const payload = getErrorPayload(error);
+  const response = isRecord(error) && isRecord(error.response) ? error.response : undefined;
+  const status = typeof response?.status === 'number' ? response.status : undefined;
+
+  const payloadCode =
+    typeof payload?.errorCode === 'string'
+      ? payload.errorCode
+      : typeof payload?.error_code === 'string'
+        ? payload.error_code
+        : typeof payload?.code === 'string'
+          ? payload.code
+          : undefined;
+
+  const payloadMessage = getFirstMessage(payload?.message) ?? getFirstMessage(payload?.error);
+
+  if (payloadMessage || payloadCode) {
+    return {
+      status,
+      code: payloadCode,
+      message: payloadMessage ?? payloadCode ?? fallbackMessage,
+      details: payload?.details,
+    };
+  }
+
+  if (isRecord(error) && error.request && !response) {
+    return {
+      message: 'Cannot reach the server. Please check your connection and try again.',
+    };
+  }
+
+  if (error instanceof Error && error.message) {
+    return { status, message: error.message };
+  }
+
+  return { status, message: fallbackMessage };
+};
+
+export const getApiErrorMessage = (error: unknown, fallbackMessage?: string) =>
+  toApiError(error, fallbackMessage).message;
+
+export const getApiErrorCode = (error: unknown) => toApiError(error).code;
+
 const unwrap = <T>(payload: ApiEnvelope<T>): T => {
   if (payload && typeof payload === 'object') {
     if ('data' in payload) return (payload as { data: T }).data;
@@ -36,12 +114,17 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    const apiError = toApiError(error);
     if (error.response) {
       console.error('API Error:', {
         status: error.response.status,
         url: error.config?.url,
         method: error.config?.method,
+        code: apiError.code,
+        message: apiError.message,
       });
+    } else {
+      console.error('API Error:', apiError.message);
     }
     return Promise.reject(error);
   }

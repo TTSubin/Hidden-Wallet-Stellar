@@ -3,6 +3,7 @@ import { useWallet } from '@/context/WalletContext';
 import { useAuth } from '@/context/AuthContext';
 import { useEffect, useState } from 'react';
 import { Copy, Check, LogOut, Wallet, ChevronRight } from 'lucide-react';
+import { getApiErrorMessage } from '@/services/api';
 
 const isMobileDevice = (): boolean => {
   if (typeof window === 'undefined') return false;
@@ -56,7 +57,7 @@ const Login = () => {
       await connect();
       setShowWalletOptions(true);
     } catch (err) {
-      setAuthError(err instanceof Error ? err.message : 'Failed to connect Freighter');
+      setAuthError(getApiErrorMessage(err, 'Failed to connect Freighter'));
     }
   };
 
@@ -66,8 +67,7 @@ const Login = () => {
       const { needsOnboarding } = await loginWithWallet();
       navigate(needsOnboarding ? '/onboarding' : '/dashboard');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Login failed';
-      setAuthError(message);
+      setAuthError(getApiErrorMessage(err, 'Login failed'));
     }
   };
 

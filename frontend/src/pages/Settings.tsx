@@ -10,6 +10,8 @@ import {
   addOnchainWallet,
   deleteOffchainBank,
   deleteOnchainWallet,
+  getApiErrorCode,
+  getApiErrorMessage,
   getDefaultPaymentMethod,
   getKycLink,
   getKycStatus,
@@ -187,7 +189,7 @@ const Settings = () => {
       // KYC status is now read directly from user object - no API call needed
     } catch (e) {
       console.error('Failed to load settings', e);
-      setSettingsError('Failed to load settings');
+      setSettingsError(getApiErrorMessage(e, 'Failed to load settings'));
     } finally {
       setIsLoadingSettings(false);
     }
@@ -236,7 +238,7 @@ const Settings = () => {
       setView('main');
     } catch (e) {
       console.error('Failed to add wallet', e);
-      setSettingsError('Failed to add wallet');
+      setSettingsError(getApiErrorMessage(e, 'Failed to add wallet'));
     } finally {
       setIsLoadingSettings(false);
     }
@@ -278,7 +280,7 @@ const Settings = () => {
       }
     } catch (error) {
       console.error('Bank QR parsing error:', error);
-      setParseError('Failed to parse QR code');
+      setParseError(getApiErrorMessage(error, 'Failed to parse QR code'));
     } finally {
       setIsParsing(false);
     }
@@ -300,7 +302,7 @@ const Settings = () => {
       setView('main');
     } catch (e) {
       console.error('Failed to add bank account', e);
-      setSettingsError('Failed to add bank account');
+      setSettingsError(getApiErrorMessage(e, 'Failed to add bank account'));
     } finally {
       setIsLoadingSettings(false);
     }
@@ -324,7 +326,7 @@ const Settings = () => {
       await refreshSettings();
     } catch (e) {
       console.error('Failed to remove wallet', e);
-      setSettingsError('Failed to remove wallet');
+      setSettingsError(getApiErrorMessage(e, 'Failed to remove wallet'));
     } finally {
       setIsLoadingSettings(false);
     }
@@ -372,8 +374,9 @@ const Settings = () => {
       // For bank type, don't refresh balance (banks don't have crypto)
     } catch (e: unknown) {
       const err = e as ApiErrorWithResponse;
+      const errorCode = getApiErrorCode(e);
       // Handle 409 Conflict (Wallet already exists)
-      if (err.response?.status === 409 && address) {
+      if ((err.response?.status === 409 || errorCode === 'WALLET_ALREADY_EXISTS' || errorCode === 'CONFLICT') && address) {
         try {
           // Fetch fresh list to find the existing wallet ID
           const response = await listOnchainWallets();
@@ -395,11 +398,11 @@ const Settings = () => {
           }
         } catch (retryErr) {
           console.error('Failed to retry set default after 409:', retryErr);
-          toast.error('Failed to set default wallet');
+          toast.error(getApiErrorMessage(retryErr, 'Failed to set default wallet'));
         }
       }
 
-      setSettingsError('Failed to set default account');
+      setSettingsError(getApiErrorMessage(e, 'Failed to set default account'));
     } finally {
       setIsLoadingSettings(false);
     }
@@ -420,7 +423,7 @@ const Settings = () => {
       await refreshSettings();
     } catch (e) {
       console.error('Failed to remove bank', e);
-      setSettingsError('Failed to remove bank account');
+      setSettingsError(getApiErrorMessage(e, 'Failed to remove bank account'));
     } finally {
       setIsLoadingSettings(false);
     }
@@ -445,7 +448,7 @@ const Settings = () => {
         setSettingsError('Failed to get KYC link');
       }
     } catch (e) {
-      setSettingsError('Failed to start KYC');
+      setSettingsError(getApiErrorMessage(e, 'Failed to start KYC'));
     } finally {
       setIsLoadingSettings(false);
     }
@@ -498,7 +501,7 @@ const Settings = () => {
       setParseError('Invalid QR. Please scan a valid Stellar wallet address (G...).');
     } catch (error) {
       console.error('Wallet QR parsing error:', error);
-      setParseError('Failed to parse QR code. Please enter address manually.');
+      setParseError(getApiErrorMessage(error, 'Failed to parse QR code. Please enter address manually.'));
     } finally {
       setIsParsing(false);
     }

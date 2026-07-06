@@ -13,6 +13,7 @@ import {
   isValidStellarPublicKey,
   stroopsToXlm,
 } from '@/lib/stellar';
+import { isDifferentWalletAddress } from './walletGuards';
 
 type HorizonAccountBalance = {
   balance: string;
@@ -191,6 +192,15 @@ function freighterSignatureToBase64(value: unknown): string {
   throw new Error('Freighter did not return a signature');
 }
 
+async function getActiveFreighterAddress(): Promise<string | null> {
+  const connected = await freighterIsConnected();
+  if (connected.error || !connected.isConnected) return null;
+
+  const res = await getAddress();
+  if (res.error || !res.address) return null;
+  return res.address;
+}
+
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [state, setState] = useState<WalletState>({
@@ -226,13 +236,28 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const connected = await freighterIsConnected();
-      if (connected.error || !connected.isConnected) return;
-      const res = await getAddress();
-      if (!cancelled && !res.error && res.address) setWalletAddress(res.address);
+      const activeAddress = await getActiveFreighterAddress();
+      if (!cancelled && activeAddress) setWalletAddress(activeAddress);
     })();
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const intervalId = window.setInterval(async () => {
+      const activeAddress = await getActiveFreighterAddress();
+      if (cancelled) return;
+      setWalletAddress((currentAddress) => {
+        if (!activeAddress) return currentAddress;
+        return isDifferentWalletAddress(currentAddress, activeAddress) ? activeAddress : currentAddress;
+      });
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
     };
   }, []);
 
@@ -363,6 +388,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const signAuthMessage = async (message: string): Promise<string> => {
     if (!walletAddress) throw new Error('No wallet connected');
+    const activeAddress = await getActiveFreighterAddress();
+    if (isDifferentWalletAddress(walletAddress, activeAddress)) {
+      throw new Error('Freighter account changed. Please sign in again with the selected wallet.');
+    }
     const res = await freighterSignMessage(message, { networkPassphrase: NETWORK_PASSPHRASE, address: walletAddress });
     if (res.error) throw new Error(res.error.message);
     return freighterSignatureToBase64(res.signedMessage);
@@ -370,6 +399,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const sendUsdc = async (toAddress: string, amount: number): Promise<{ success: boolean; digest?: string; message?: string }> => {
     if (!walletAddress) return { success: false, message: 'No wallet connected' };
+    const activeAddress = await getActiveFreighterAddress();
+    if (isDifferentWalletAddress(walletAddress, activeAddress)) {
+      return { success: false, message: 'Freighter account changed. Please sign in again with the selected wallet.' };
+    }
     if (!isValidWalletAddress(toAddress)) return { success: false, message: 'Invalid Stellar recipient address' };
     if (!USDC_ASSET_ISSUER) return { success: false, message: 'USDC issuer is not configured' };
     if (!Number.isFinite(amount) || amount <= 0) return { success: false, message: 'Invalid USDC amount' };
@@ -441,6 +474,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const sendXlm = async (toAddress: string, amount: number): Promise<{ success: boolean; digest?: string; message?: string }> => {
     if (!walletAddress) return { success: false, message: 'No wallet connected' };
+    const activeAddress = await getActiveFreighterAddress();
+    if (isDifferentWalletAddress(walletAddress, activeAddress)) {
+      return { success: false, message: 'Freighter account changed. Please sign in again with the selected wallet.' };
+    }
     if (STELLAR_NETWORK !== 'TESTNET') return { success: false, message: 'XLM test transaction flow requires Stellar testnet' };
     if (!isValidWalletAddress(toAddress)) return { success: false, message: 'Invalid Stellar recipient address' };
     if (!Number.isFinite(amount) || amount <= 0) return { success: false, message: 'Invalid XLM amount' };
