@@ -369,29 +369,43 @@ const Send = () => {
     }
   };
 
-  // Types for Scan QR Response
-  type ScanQrResponse = {
-    type: 'username' | 'onchain' | 'offchain';
-    address?: string;
-    user?: {
-      username: string;
-      displayName?: string;
-      defaultWallet?: {
-        type: 'onchain' | 'offchain';
-        address?: string; // for onchain
-        bankName?: string; // for offchain
-        accountNumber?: string;
-      };
-    };
-    bankInfo?: {
-      bankName: string;
-      accountNumber: string;
-      accountName: string;
-      amount?: number;
-      bankBin?: string;
-      country?: string;
-    };
+  type ScanQrUser = {
+    username: string;
+    displayName?: string;
+    defaultWallet?:
+      | {
+          type: 'onchain';
+          address: string;
+        }
+      | {
+          type: 'offchain';
+          bankName?: string;
+          accountNumber?: string;
+        };
   };
+
+  type ScanQrResponse =
+    | {
+        type: 'username';
+        user: ScanQrUser;
+      }
+    | {
+        type: 'onchain';
+        address: string;
+        user?: ScanQrUser;
+      }
+    | {
+        type: 'offchain';
+        user?: ScanQrUser;
+        bankInfo?: {
+          bankName: string;
+          accountNumber: string;
+          accountName: string;
+          amount?: number;
+          bankBin?: string;
+          country?: string;
+        };
+      };
 
   const handleQRScanned = async (qrString: string) => {
     if (!qrString) return;

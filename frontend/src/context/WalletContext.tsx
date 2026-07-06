@@ -267,7 +267,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       const server = new Horizon.Server(HORIZON_URL);
       const records = await server.transactions().forAccount(address).order('desc').limit(20).call();
       const txs = await Promise.all(
-        records.records.map(async (tx) => {
+        records.records.map(async (tx): Promise<TransactionRecord | null> => {
           let matchingPayment: HorizonPaymentOperation | undefined;
 
           try {
