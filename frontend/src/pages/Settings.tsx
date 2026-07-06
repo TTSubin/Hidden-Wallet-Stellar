@@ -523,6 +523,7 @@ const Settings = () => {
             <div className="flex justify-between items-center mb-6 animate-fade-in">
               <h1 className="text-xl font-bold">Add Wallet</h1>
               <button
+                type="button"
                 onClick={() => { setView('main'); setParseError(''); setNewWalletAddress(''); setNewWalletName(''); }}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
@@ -533,6 +534,7 @@ const Settings = () => {
             <div className="flex-1 space-y-4 animate-slide-up">
               {/* Scan QR Button */}
               <button
+                type="button"
                 onClick={() => setShowScanner(true)}
                 disabled={isParsing}
                 className="w-full py-4 rounded-xl bg-secondary hover:bg-secondary/80 text-center font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50"
@@ -591,6 +593,7 @@ const Settings = () => {
             </div>
 
             <button
+              type="button"
               onClick={handleAddWallet}
               disabled={!newWalletName || !newWalletAddress}
               className="btn-primary mt-6"
@@ -619,6 +622,7 @@ const Settings = () => {
             <div className="flex justify-between items-center mb-6 animate-fade-in">
               <h1 className="text-xl font-bold">Add Bank Account</h1>
               <button
+                type="button"
                 onClick={() => { setView('main'); setScannedBank(null); setParseError(''); }}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
@@ -629,6 +633,7 @@ const Settings = () => {
             <div className="flex-1 space-y-4 animate-slide-up">
               {/* Scan QR Button */}
               <button
+                type="button"
                 onClick={() => setShowScanner(true)}
                 disabled={isParsing}
                 className="w-full py-4 rounded-xl bg-secondary hover:bg-secondary/80 text-center font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50"
@@ -691,6 +696,7 @@ const Settings = () => {
             </div>
 
             <button
+              type="button"
               onClick={handleAddBank}
               disabled={!scannedBank}
               className="btn-primary mt-6"
@@ -713,6 +719,9 @@ const Settings = () => {
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background">
             <h2 className="font-semibold">Verify Identity</h2>
             <button
+              type="button"
+              aria-label="Close KYC verification"
+              title="Close KYC verification"
               onClick={() => {
                 setShowKycModal(false);
                 setKycUrl(null);
@@ -738,6 +747,9 @@ const Settings = () => {
           {/* Header */}
           <div className="flex items-center gap-2 mb-6 animate-fade-in">
             <button
+              type="button"
+              aria-label="Back to dashboard"
+              title="Back to dashboard"
               onClick={() => navigate('/dashboard')}
               className="p-2 -ml-2 rounded-full hover:bg-secondary transition-colors"
             >
@@ -781,6 +793,8 @@ const Settings = () => {
                         </div>
                         <div className="flex items-center gap-2">
                           <button
+                            type="button"
+                            aria-label={copiedWalletId === wallet.walletId ? 'Address copied' : 'Copy wallet address'}
                             onClick={() => {
                               navigator.clipboard.writeText(wallet.address);
                               setCopiedWalletId(wallet.walletId);
@@ -801,6 +815,7 @@ const Settings = () => {
                             <span className="tag-success">Default</span>
                           ) : (
                             <button
+                              type="button"
                               onClick={() => handleSetDefault(wallet.walletId, 'wallet', wallet.address)}
                               className="text-xs font-medium text-muted-foreground hover:text-primary px-3 py-1.5 rounded-full hover:bg-secondary transition-colors"
                             >
@@ -809,6 +824,8 @@ const Settings = () => {
                           )}
                           {!isActiveWallet && displayWallets.length > 1 && !isTemporary && (
                             <button
+                              type="button"
+                              aria-label={`Remove ${wallet.label || 'wallet'}`}
                               onClick={() => handleRemoveWallet(wallet.walletId)}
                               className="p-2 hover:bg-destructive/10 transition-colors"
                               title="Remove"
@@ -867,6 +884,7 @@ const Settings = () => {
                 })
               )}
               <button
+                type="button"
                 onClick={() => setView('add-wallet')}
                 className="w-full py-4 text-center font-medium hover:bg-secondary transition-colors flex items-center justify-center gap-2"
               >
@@ -901,6 +919,7 @@ const Settings = () => {
                         <span className="tag-success">Default</span>
                       ) : (
                         <button
+                          type="button"
                           onClick={() => handleSetDefault(bank.bankId, 'bank')}
                           className="text-xs font-medium text-muted-foreground hover:text-primary px-3 py-1.5 rounded-full hover:bg-secondary transition-colors"
                         >
@@ -908,6 +927,8 @@ const Settings = () => {
                         </button>
                       )}
                       <button
+                        type="button"
+                        aria-label={`Remove ${bank.label || bank.bankName} bank account`}
                         onClick={() => handleRemoveBank(bank.bankId)}
                         className="p-2 hover:bg-destructive/10 transition-colors"
                         title="Remove"
@@ -919,6 +940,7 @@ const Settings = () => {
                 ))
               )}
               <button
+                type="button"
                 onClick={() => setView('add-bank')}
                 className="w-full py-4 text-center font-medium hover:bg-secondary transition-colors border-t border-border flex items-center justify-center gap-2"
               >
@@ -948,6 +970,7 @@ const Settings = () => {
                   )}
                 </div>
                 <button
+                  type="button"
                   onClick={handleStartKyc}
                   disabled={isLoadingSettings || !walletAddressForKyc || kycStatus === 'pending'}
                   className="w-full py-3 mt-4 rounded-xl border border-border hover:bg-accent transition-colors"
@@ -962,6 +985,7 @@ const Settings = () => {
 
           {/* Disconnect */}
           <button
+            type="button"
             onClick={handleDisconnect}
             className="w-full py-4 rounded-xl text-destructive text-center font-medium border border-destructive hover:bg-destructive hover:text-white transition-colors flex items-center justify-center gap-2"
           >

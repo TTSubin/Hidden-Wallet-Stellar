@@ -88,6 +88,8 @@ const Receive = () => {
             <button
               onClick={() => navigate('/dashboard')}
               className="p-2 -ml-2 rounded-full hover:bg-secondary transition-colors"
+              aria-label="Back to dashboard"
+              title="Back to dashboard"
             >
               <ChevronLeft className="w-6 h-6" />
             </button>
@@ -128,6 +130,8 @@ const Receive = () => {
           <button
             onClick={() => navigate('/dashboard')}
             className="p-2 -ml-2 rounded-full hover:bg-secondary transition-colors"
+            aria-label="Back to dashboard"
+            title="Back to dashboard"
           >
             <ChevronLeft className="w-6 h-6" />
           </button>

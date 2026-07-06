@@ -1049,7 +1049,13 @@ const Send = () => {
         <div className="page-wrapper">
           <div className="flex justify-between items-center mb-6 animate-fade-in">
             <h1 className="text-xl font-bold">Send</h1>
-            <button onClick={() => navigate('/dashboard')} className="p-2 text-muted-foreground hover:text-foreground transition-colors">
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard')}
+              className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Close send screen"
+              title="Close send screen"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -1096,7 +1102,13 @@ const Send = () => {
                     <CreditCard className="w-5 h-5 text-muted-foreground" />
                     <span className="font-semibold">Bank Transfer Details</span>
                   </div>
-                  <button onClick={clearRecipient} className="text-muted-foreground hover:text-foreground">
+                  <button
+                    type="button"
+                    onClick={clearRecipient}
+                    className="text-muted-foreground hover:text-foreground"
+                    aria-label="Clear recipient"
+                    title="Clear recipient"
+                  >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -1128,8 +1140,11 @@ const Send = () => {
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm font-mono">{externalBank.accountNumber}</span>
                     <button
+                      type="button"
                       onClick={() => copyToClipboard(externalBank.accountNumber, 'account')}
                       className="p-1 hover:bg-secondary rounded transition-colors"
+                      aria-label="Copy account number"
+                      title="Copy account number"
                     >
                       {copiedField === 'account' ? (
                         <Check className="w-3 h-3 text-success" />

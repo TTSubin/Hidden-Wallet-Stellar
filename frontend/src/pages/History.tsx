@@ -81,8 +81,11 @@ const History = () => {
                     <div className="flex justify-between items-center mb-6">
                         <div className="flex items-center gap-3">
                             <button
+                                type="button"
                                 onClick={() => setSelectedTxId(null)}
                                 className="p-2 border border-border rounded-xl hover:bg-secondary transition-colors"
+                                aria-label="Back to transaction history"
+                                title="Back to transaction history"
                             >
                                 <ArrowLeft className="w-5 h-5" />
                             </button>
@@ -123,8 +126,11 @@ const History = () => {
                             <div className="flex justify-between items-center gap-3 mb-2">
                                 <span className="text-muted-foreground text-sm">Transaction hash</span>
                                 <button
+                                    type="button"
                                     onClick={() => copyDigest(txHash)}
                                     className="p-1 hover:bg-secondary rounded transition-colors"
+                                    aria-label="Copy transaction hash"
+                                    title="Copy transaction hash"
                                 >
                                     {copiedDigest === txHash ? (
                                         <Check className="w-4 h-4 text-success" />
@@ -157,17 +163,23 @@ const History = () => {
                 <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-3">
                         <button
+                            type="button"
                             onClick={() => navigate('/dashboard')}
                             className="p-2 border border-border rounded-xl hover:bg-secondary transition-colors"
+                            aria-label="Back to dashboard"
+                            title="Back to dashboard"
                         >
                             <ArrowLeft className="w-5 h-5" />
                         </button>
                         <h1 className="text-xl font-bold">Transaction History</h1>
                     </div>
                     <button
+                        type="button"
                         onClick={() => refreshBalance()}
                         disabled={isLoadingBalance}
                         className="p-2 border border-border rounded-xl hover:bg-secondary transition-colors disabled:opacity-50"
+                        aria-label="Refresh transactions"
+                        title="Refresh transactions"
                     >
                         <RefreshCw className={`w-5 h-5 ${isLoadingBalance ? 'animate-spin' : ''}`} />
                     </button>
@@ -236,6 +248,8 @@ const History = () => {
                                                                 copyDigest(txHash);
                                                             }}
                                                             className="p-0.5 hover:bg-secondary rounded transition-colors"
+                                                            aria-label="Copy transaction hash"
+                                                            title="Copy transaction hash"
                                                         >
                                                             {copiedDigest === txHash ? (
                                                                 <Check className="w-3 h-3 text-success" />

@@ -197,6 +197,8 @@ const Dashboard = () => {
                         <button
                             onClick={() => setShowBalance(!showBalance)}
                             className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                            aria-label={showBalance ? 'Hide balance' : 'Show balance'}
+                            title={showBalance ? 'Hide balance' : 'Show balance'}
                         >
                             {showBalance ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
                         </button>
