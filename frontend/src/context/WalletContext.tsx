@@ -13,7 +13,7 @@ import {
   isValidStellarPublicKey,
   stroopsToXlm,
 } from '@/lib/stellar';
-import { isDifferentWalletAddress } from './walletGuards';
+import { isDifferentWalletAddress, shouldApplyWalletFetchResult } from './walletGuards';
 
 type HorizonAccountBalance = {
   balance: string;
@@ -225,6 +225,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const stateRef = useRef(state);
   stateRef.current = state;
+  const latestBalanceRequestIdRef = useRef(0);
 
   const connect = useCallback(async () => {
     const res = await requestAccess();
@@ -319,7 +320,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
 
     if (!targetAddress) return;
+    const requestId = latestBalanceRequestIdRef.current + 1;
+    latestBalanceRequestIdRef.current = requestId;
     setState((prev) => ({ ...prev, isLoadingBalance: true }));
+
+    const getCurrentTargetAddress = () => {
+      const currentState = stateRef.current;
+      if (forcedAddress) return forcedAddress;
+      if (currentState.defaultAccountType === 'wallet' && currentState.defaultAccountId) {
+        return currentState.linkedWallets.find((w) => w.id === currentState.defaultAccountId)?.address ?? walletAddress;
+      }
+      return walletAddress;
+    };
 
     try {
       const server = new Horizon.Server(HORIZON_URL);
@@ -358,6 +370,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         return b.totalBalance - a.totalBalance;
       });
 
+      if (!shouldApplyWalletFetchResult({
+        requestId,
+        latestRequestId: latestBalanceRequestIdRef.current,
+        requestTargetAddress: targetAddress,
+        currentTargetAddress: getCurrentTargetAddress(),
+      })) {
+        return;
+      }
+
       setState((prev) => ({
         ...prev,
         xlmBalance: xlm,
@@ -367,11 +388,26 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         isLoadingBalance: false,
       }));
 
-      fetchTransactions(targetAddress).then((txHistory) => {
-        setState((prev) => ({ ...prev, transactions: txHistory }));
-      });
+      const txHistory = await fetchTransactions(targetAddress);
+      if (!shouldApplyWalletFetchResult({
+        requestId,
+        latestRequestId: latestBalanceRequestIdRef.current,
+        requestTargetAddress: targetAddress,
+        currentTargetAddress: getCurrentTargetAddress(),
+      })) {
+        return;
+      }
+      setState((prev) => ({ ...prev, transactions: txHistory }));
     } catch (error) {
       console.error('Failed to fetch Stellar balance:', error);
+      if (!shouldApplyWalletFetchResult({
+        requestId,
+        latestRequestId: latestBalanceRequestIdRef.current,
+        requestTargetAddress: targetAddress,
+        currentTargetAddress: getCurrentTargetAddress(),
+      })) {
+        return;
+      }
       setState((prev) => ({ ...prev, isLoadingBalance: false }));
     }
   }, [fetchTransactions, walletAddress]);
