@@ -3,6 +3,9 @@ node_modules
 /build
 /coverage
 /.cache
+target/
+contracts/payment-order/deployments/testnet.json
+contracts/payment-order/deployments/testnet-deployer.json
 /.vscode
 /.idea
 

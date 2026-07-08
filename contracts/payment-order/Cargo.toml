@@ -1,0 +1,15 @@
+[package]
+name = "payment-order"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+soroban-sdk = "26.1.0"
+
+[dev-dependencies]
+ed25519-dalek = { version = "=2.2.0", features = ["rand_core"] }
+soroban-sdk = { version = "26.1.0", features = ["testutils"] }
